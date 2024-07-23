@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "public": "dist",
+    "site": "rsa-staff-dashboard",
+
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "predeploy": ["vite build"]
+
+  }
+}
