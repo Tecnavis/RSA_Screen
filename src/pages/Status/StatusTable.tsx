@@ -105,7 +105,8 @@ const StatusBadge = styled.span`
             case 'called to customer':
                 return '#2980b9';
             case 'Order Received':
-                return '#27ae60';
+                return '#d4ac0d'; 
+
             case 'On the way to pickup location':
                 return '#16a085';
             case 'Vehicle Confirmed':
@@ -200,7 +201,7 @@ const StatusTable = () => {
     const ongoingBookings = sortedRecordsData.filter((record) => record.status !== 'Order Completed');
 
     return (
-        <Container>
+        <Container style={{padding:"40px"}}>
             <Title>Driver Status</Title>
             <Index />
             <Table>
