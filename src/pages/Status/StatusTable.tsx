@@ -1,11 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { setPageTitle } from '../../store/themeConfigSlice';
-import { collection, getDocs, getFirestore, onSnapshot, doc, getDoc, query, orderBy } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  getFirestore,
+  onSnapshot,
+  doc,
+  getDoc,
+  query,
+  orderBy,
+} from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import Index from '../Index';
+import Timer from './Timer'; // Import Timer component
 
+// Define keyframes for animations
 const fadeIn = keyframes`
     from {
         opacity: 0;
@@ -15,6 +26,13 @@ const fadeIn = keyframes`
     }
 `;
 
+const blink = keyframes`
+    0% { background-color: #f8f9fa; }
+    50% { background-color: #e2e6ea; }
+    100% { background-color: #f8f9fa; }
+`;
+
+// Styled-components for layout and styling
 const Container = styled.div`
     position: relative;
     padding: 20px;
@@ -36,7 +54,7 @@ const TableHeader = styled.th`
     text-align: left;
 `;
 
-const TableRow = styled.tr`
+const TableRow = styled.tr<{ highlight?: boolean }>`
     background-color: ${(props) => (props.highlight ? 'lightblue' : 'white')};
     &:nth-child(even) {
         background-color: #f2f2f2;
@@ -57,6 +75,7 @@ const Title = styled.h1`
     text-align: center;
     margin-bottom: 20px;
 `;
+
 const TimerContainer = styled.div`
     display: flex;
     align-items: center;
@@ -83,16 +102,11 @@ const TimerText = styled.span`
     color: #e67e22;
 `;
 
-const blink = keyframes`
-    0% { background-color: #f8f9fa; }
-    50% { background-color: #e2e6ea; }
-    100% { background-color: #f8f9fa; }
-`;
-
 const BlinkingRow = styled.tr`
     animation: ${blink} 1s linear infinite;
 `;
-const StatusBadge = styled.span`
+
+const StatusBadge = styled.span<{ status: string }>`
     padding: 4px 15px;
     border-radius: 25px;
     font-weight: bold;
@@ -105,8 +119,7 @@ const StatusBadge = styled.span`
             case 'called to customer':
                 return '#2980b9';
             case 'Order Received':
-                return '#d4ac0d'; 
-
+                return '#d4ac0d';
             case 'On the way to pickup location':
                 return '#16a085';
             case 'Vehicle Confirmed':
@@ -144,36 +157,51 @@ const StatusBadge = styled.span`
             }
         }};
     }
-    animation: fadeIn 1.5s ease-in-out;
+    animation: ${fadeIn} 1.5s ease-in-out;
     letter-spacing: 1px;
 `;
+
+// Define the BookingRecord interface
+interface BookingRecord {
+    id: string;
+    dateTime?: string;
+    status?: string;
+    bookingStatus?: string;
+    bookingId?: string;
+    driver?: string;
+    vehicleNumber?: string;
+    selectedDriver?: string;
+}
 
 const StatusTable = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const [recordsData, setRecordsData] = useState([]);
-    const [drivers, setDrivers] = useState({});
+    const [recordsData, setRecordsData] = useState<BookingRecord[]>([]);
+    const [drivers, setDrivers] = useState<{ [key: string]: any }>({});
     const [searchQuery, setSearchQuery] = useState('');
     const db = getFirestore();
+    const uid = import.meta.env.VITE_REACT_APP_UID;
 
     useEffect(() => {
         dispatch(setPageTitle('Status'));
 
         const fetchBookings = async () => {
-            const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+            const q = query(collection(db, `user/${uid}/bookings`), orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
-            const updatedBookingsData = querySnapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
+            const updatedBookingsData: BookingRecord[] = querySnapshot.docs.map((doc) => {
+                const data = doc.data() as BookingRecord;
+                const { id, ...rest } = data; // Destructure to remove the id from data
+                return { id: doc.id, ...rest }; // Include the id separately
+            });
+            
             setRecordsData(updatedBookingsData);
 
-            const driverData = {};
+            const driverData: { [key: string]: any } = {};
             for (const record of updatedBookingsData) {
                 const driverId = record.selectedDriver;
 
                 if (driverId && !driverData[driverId]) {
-                    const driverDoc = await getDoc(doc(db, 'driver', driverId));
+                    const driverDoc = await getDoc(doc(db, `user/${uid}/driver`, driverId));
                     if (driverDoc.exists()) {
                         driverData[driverId] = driverDoc.data();
                     }
@@ -182,26 +210,32 @@ const StatusTable = () => {
             setDrivers(driverData);
         };
 
-        const unsubscribe = onSnapshot(collection(db, 'bookings'), () => {
+        const unsubscribe = onSnapshot(collection(db, `user/${uid}/bookings`), () => {
             fetchBookings();
         });
 
-        return () => unsubscribe();
-    }, [db, dispatch]);
+        fetchBookings(); // Initial fetch
 
-    const filteredRecordsData = recordsData.filter((record) => Object.values(record).some((value) => value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())));
+        return () => unsubscribe();
+    }, [db, dispatch, uid]);
+
+    const filteredRecordsData = recordsData.filter((record) =>
+        Object.values(record).some((value) =>
+            value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    );
 
     const sortedRecordsData = filteredRecordsData.slice().sort((a, b) => {
-        const dateA = new Date(a.dateTime);
-        const dateB = new Date(b.dateTime);
-        return dateB - dateA;
+        const dateA = new Date(a.dateTime || '');
+        const dateB = new Date(b.dateTime || '');
+        return dateB.getTime() - dateA.getTime();
     });
 
     const completedBookings = sortedRecordsData.filter((record) => record.status === 'Order Completed');
     const ongoingBookings = sortedRecordsData.filter((record) => record.status !== 'Order Completed');
 
     return (
-        <Container style={{padding:"40px"}}>
+        <Container style={{ padding: '40px' }}>
             <Title>Driver Status</Title>
             <Index />
             <Table>
@@ -222,8 +256,12 @@ const StatusTable = () => {
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
                             <TableData>
-                                <StatusBadge  className='flex' status={record.status}>{record.status}</StatusBadge>
-                                {record.status === 'Vehicle Picked' && <Timer status={record.status} />}
+                                <StatusBadge className="flex" status={record.status || 'Unknown'}>
+                                    {record.status}
+                                </StatusBadge>
+                                {record.status === 'Vehicle Picked' && (
+                                    <Timer status={record.status} onTimeUp={() => { /* Handle time up event */ }} />
+                                )}
                             </TableData>
                         </TableRow>
                     ))}
@@ -248,7 +286,9 @@ const StatusTable = () => {
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
                             <TableData>
-                                <StatusBadge className='flex' status="Order Completed">{record.status}</StatusBadge>
+                                <StatusBadge status={record.status || 'Completed'}>
+                                    {record.status || 'Completed'}
+                                </StatusBadge>
                             </TableData>
                         </TableRow>
                     ))}
@@ -257,40 +297,5 @@ const StatusTable = () => {
         </Container>
     );
 };
-
-const Timer = ({ status, onTimeUp }) => {
-    const [time, setTime] = useState(0);
-
-    useEffect(() => {
-        if (status === 'Vehicle Picked') {
-            const startTime = Date.now();
-            const interval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                setTime(elapsed);
-
-                if (elapsed >= 7200) { // 2 hours in seconds
-                    clearInterval(interval);
-                    onTimeUp(); // Notify the parent component
-                }
-            }, 1000);
-
-            return () => clearInterval(interval);
-        }
-    }, [status, onTimeUp]);
-
-    const formatTime = (seconds) => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${minutes}m ${secs}s`;
-    };
-
-    return (
-        <TimerContainer>
-            <TimerIcon>⏱️</TimerIcon>
-            <TimerText>{formatTime(time)}</TimerText>
-        </TimerContainer>
-    );
-};
-
 
 export default StatusTable;

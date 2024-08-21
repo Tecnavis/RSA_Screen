@@ -1,7 +1,7 @@
 {
   "hosting": {
-    "site":"rsa-status",
     "public": "dist",
+    "site": "rsascreen",
     "ignore": [
       "firebase.json",
       "**/.*",
