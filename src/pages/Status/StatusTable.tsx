@@ -10,6 +10,7 @@ import {
   getDoc,
   query,
   orderBy,
+  Timestamp,
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
@@ -26,12 +27,17 @@ const fadeIn = keyframes`
     }
 `;
 
-const blink = keyframes`
-    0% { background-color: #f8f9fa; }
-    50% { background-color: #e2e6ea; }
-    100% { background-color: #f8f9fa; }
+const FlexContainer = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Adds space between the status and timer */
 `;
 
+const PickedTimeText = styled.span`
+    font-size: 0.9rem;     
+    color: #555;           
+    font-weight: 500;      
+`;
 // Styled-components for layout and styling
 const Container = styled.div`
     position: relative;
@@ -76,35 +82,6 @@ const Title = styled.h1`
     margin-bottom: 20px;
 `;
 
-const TimerContainer = styled.div`
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px 10px;
-    border-radius: 5px;
-    background: linear-gradient(145deg, #f8f9fa, #e2e6ea);
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-    font-family: 'Arial', sans-serif;
-    color: #333;
-    font-size: 16px;
-    font-weight: bold;
-`;
-
-const TimerIcon = styled.span`
-    margin-right: 8px;
-    font-size: 18px;
-    color: #e67e22;
-`;
-
-const TimerText = styled.span`
-    display: inline-block;
-    font-size: 16px;
-    color: #e67e22;
-`;
-
-const BlinkingRow = styled.tr`
-    animation: ${blink} 1s linear infinite;
-`;
 
 const StatusBadge = styled.span<{ status: string }>`
     padding: 4px 15px;
@@ -126,6 +103,8 @@ const StatusBadge = styled.span<{ status: string }>`
                 return '#8e44ad';
             case 'Vehicle Picked':
                 return '#e67e22';
+                case 'Cancelled':
+                return 'red';
             case 'To DropOff Location':
                 return '#d35400';
             case 'On the way to dropoff location':
@@ -171,6 +150,7 @@ interface BookingRecord {
     driver?: string;
     vehicleNumber?: string;
     selectedDriver?: string;
+    pickedTime?: Timestamp;
 }
 
 const StatusTable = () => {
@@ -233,7 +213,21 @@ const StatusTable = () => {
 
     const completedBookings = sortedRecordsData.filter((record) => record.status === 'Order Completed');
     const ongoingBookings = sortedRecordsData.filter((record) => record.status !== 'Order Completed');
+    const formatTimestamp = (timestamp: Timestamp): string => {
+        if (!timestamp) return '';
+        const date = timestamp.toDate();
+        const formattedDate = date.toLocaleDateString('en-GB');
+        const formattedTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return `${formattedDate} ${formattedTime}`;
+    };
 
+    const shouldBlink = (pickedTime: Timestamp | undefined): boolean => {
+        if (!pickedTime) return false;
+        const now = new Date();
+        const pickedDate = pickedTime.toDate();
+        const endTime = new Date(pickedDate.getTime() + 2 * 60 * 1000); // pickedTime + 2 minutes
+        return now >= endTime;
+    };
     return (
         <Container style={{ padding: '40px' }}>
             <Title>Driver Status</Title>
@@ -256,13 +250,23 @@ const StatusTable = () => {
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
                             <TableData>
-                                <StatusBadge className="flex" status={record.status || 'Unknown'}>
-                                    {record.status}
-                                </StatusBadge>
-                                {record.status === 'Vehicle Picked' && (
-                                    <Timer status={record.status} onTimeUp={() => { /* Handle time up event */ }} />
-                                )}
-                            </TableData>
+    <FlexContainer>
+        <StatusBadge 
+        style={{display:"flex"}}
+            className={ shouldBlink(record.pickedTime) ? 'blinking' : ''}
+            status={record.status || 'Unknown'}
+        >
+            {record.status}
+        </StatusBadge>
+        {record.status === 'Vehicle Picked' && record.pickedTime && (
+    <>
+        {/* <PickedTimeText>Picked Time: {formatTimestamp(record.pickedTime)}</PickedTimeText> */}
+        <Timer pickedTime={record.pickedTime.toDate()} onTimeUp={() => console.log('Time is up!')} />
+    </>
+)}
+
+    </FlexContainer>
+</TableData>
                         </TableRow>
                     ))}
                 </tbody>
@@ -286,7 +290,10 @@ const StatusTable = () => {
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
                             <TableData>
-                                <StatusBadge status={record.status || 'Completed'}>
+                                <StatusBadge
+                                        style={{display:"flex"}}
+
+                                status={record.status || 'Completed'}>
                                     {record.status || 'Completed'}
                                 </StatusBadge>
                             </TableData>
