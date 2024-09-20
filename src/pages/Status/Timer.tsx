@@ -52,7 +52,6 @@ const Timer: React.FC<TimerProps> = ({ pickupDistance, onTimeUp }) => {
     const [isTimeUp, setIsTimeUp] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null); // Reference for the audio element
 
-    // Calculate the time to complete the pickup based on the distance
     const calculatePickupTime = (distance: string) => {
         const km = parseFloat(distance) || 0;
         const speedKmPerMin = 1;

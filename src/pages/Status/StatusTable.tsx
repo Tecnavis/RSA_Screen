@@ -185,11 +185,13 @@ const StatusTable = () => {
         return () => unsubscribe();
     }, [db, dispatch, uid]);
 
-    const filteredRecordsData = recordsData.filter((record) =>
-        Object.values(record).some((value) =>
-            value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredRecordsData = recordsData
+        .filter((record) =>
+            Object.values(record).some((value) =>
+                value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+            )
         )
-    );
+        .filter((record) => record.status !== 'Approved'); // Exclude "Approved" status
 
     const sortedRecordsData = filteredRecordsData.slice().sort((a, b) => {
         const dateA = new Date(a.dateTime || '');
