@@ -140,7 +140,6 @@ const StatusBadge = styled.span<{ status: string }>`
     letter-spacing: 1px;
 `;
 
-// Define the BookingRecord interface
 interface BookingRecord {
     id: string;
     dateTime?: string;
@@ -150,7 +149,7 @@ interface BookingRecord {
     driver?: string;
     vehicleNumber?: string;
     selectedDriver?: string;
-    pickedTime?: Timestamp;
+    pickupDistance?: string; // Add pickupDistance in km
 }
 
 const StatusTable = () => {
@@ -170,24 +169,11 @@ const StatusTable = () => {
             const querySnapshot = await getDocs(q);
             const updatedBookingsData: BookingRecord[] = querySnapshot.docs.map((doc) => {
                 const data = doc.data() as BookingRecord;
-                const { id, ...rest } = data; // Destructure to remove the id from data
-                return { id: doc.id, ...rest }; // Include the id separately
+                const { id, ...rest } = data;
+                return { id: doc.id, ...rest };
             });
-            
+
             setRecordsData(updatedBookingsData);
-
-            const driverData: { [key: string]: any } = {};
-            for (const record of updatedBookingsData) {
-                const driverId = record.selectedDriver;
-
-                if (driverId && !driverData[driverId]) {
-                    const driverDoc = await getDoc(doc(db, `user/${uid}/driver`, driverId));
-                    if (driverDoc.exists()) {
-                        driverData[driverId] = driverDoc.data();
-                    }
-                }
-            }
-            setDrivers(driverData);
         };
 
         const unsubscribe = onSnapshot(collection(db, `user/${uid}/bookings`), () => {
@@ -221,12 +207,32 @@ const StatusTable = () => {
         return `${formattedDate} ${formattedTime}`;
     };
 
-    const shouldBlink = (pickedTime: Timestamp | undefined): boolean => {
-        if (!pickedTime) return false;
+    const calculatePickupTime = (pickupDistance: string) => {
+        console.log("Pickup distance input:", pickupDistance);
+        
+        const speedKmPerMin = 60 / 60; // 1 km per minute
+        console.log("Speed in km per minute:", speedKmPerMin);
+        
+        const distance = parseFloat(pickupDistance);
+        console.log("Parsed pickup distance (in km):", distance);
+        
+        const timeInMinutes = distance / speedKmPerMin;
+        console.log("Calculated time to reach (in minutes):", timeInMinutes);
+        
+        const totalTimeInMinutes = Math.ceil(timeInMinutes) + 15; // Add 15 minutes buffer
+        console.log("Total time with 15-minute buffer (in minutes):", totalTimeInMinutes);
+        
+        return totalTimeInMinutes;
+    };
+    
+
+    const shouldBlink = (record: BookingRecord) => {
         const now = new Date();
-        const pickedDate = pickedTime.toDate();
-        const endTime = new Date(pickedDate.getTime() + 2 * 60 * 1000); // pickedTime + 2 minutes
-        return now >= endTime;
+        const calculatedTime = calculatePickupTime(record.pickupDistance || "0");
+        const startTime = new Date(record.dateTime || now);
+        const endTime = new Date(startTime.getTime() + calculatedTime * 60000); // Add the calculated time in milliseconds
+
+        return now >= endTime && record.status === "On the way to pickup location";
     };
     return (
         <Container style={{ padding: '40px' }}>
@@ -250,23 +256,18 @@ const StatusTable = () => {
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
                             <TableData>
-    <FlexContainer>
-        <StatusBadge 
-        style={{display:"flex"}}
-            className={ shouldBlink(record.pickedTime) ? 'blinking' : ''}
-            status={record.status || 'Unknown'}
-        >
-            {record.status}
-        </StatusBadge>
-        {record.status === 'Vehicle Picked' && record.pickedTime && (
-    <>
-        {/* <PickedTimeText>Picked Time: {formatTimestamp(record.pickedTime)}</PickedTimeText> */}
-        <Timer pickedTime={record.pickedTime.toDate()} onTimeUp={() => console.log('Time is up!')} />
-    </>
-)}
-
-    </FlexContainer>
-</TableData>
+                                <FlexContainer>
+                                    <StatusBadge
+                                        className={shouldBlink(record) ? 'blinking' : ''}
+                                        status={record.status || 'Unknown'}
+                                    >
+                                        {record.status}
+                                    </StatusBadge>
+                                    {record.status === 'On the way to pickup location' && (
+                                        <Timer pickupDistance={record.pickupDistance} onTimeUp={() => console.log('Time is up!')} />
+                                    )}
+                                </FlexContainer>
+                            </TableData>
                         </TableRow>
                     ))}
                 </tbody>

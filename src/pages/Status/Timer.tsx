@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 
+// Blink animation for danger indicator
 const blinkBackground = keyframes`
     0% { background-color: #f8f9fa; }
-    25% { background-color: #e74c3c; } /* Bright red for danger */
+    25% { background-color: #e74c3c; }
     50% { background-color: #f8f9fa; }
-    75% { background-color: #e74c3c; } /* Bright red for danger */
+    75% { background-color: #e74c3c; }
     100% { background-color: #f8f9fa; }
 `;
 
+// Styling for the timer container
 const TimerContainer = styled.div`
     display: flex;
     align-items: center;
@@ -21,15 +23,10 @@ const TimerContainer = styled.div`
     color: #333;
     font-size: 16px;
     font-weight: bold;
-    width:200px
+    width: 200px;
 `;
 
-const TimerIcon = styled.span`
-    margin-right: 8px;
-    font-size: 18px;
-    color: #e67e22;
-`;
-
+// Styling for the timer text, which blinks if time is up
 const TimerText = styled.span<{ isBlinking: boolean }>`
     display: inline-block;
     font-size: 16px;
@@ -41,50 +38,85 @@ const TimerText = styled.span<{ isBlinking: boolean }>`
             animation: ${blinkBackground} 1s infinite;
             padding: 2px 4px;
             border-radius: 3px;
-            box-shadow: 0 0 10px rgba(255, 0, 0, 0.8); /* Red glow */
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
         `}
 `;
 
 interface TimerProps {
-    pickedTime: Date;
+    pickupDistance?: string;
     onTimeUp: () => void;
 }
 
-const Timer: React.FC<TimerProps> = ({ pickedTime, onTimeUp }) => {
-    const [time, setTime] = useState(() => {
-        const now = new Date();
-        const endTime = new Date(pickedTime.getTime() + 120 * 60 * 1000); // pickedTime + 5 minutes
-        const diff = endTime.getTime() - now.getTime();
-        return Math.max(0, Math.floor(diff / 1000));
-    });
+const Timer: React.FC<TimerProps> = ({ pickupDistance, onTimeUp }) => {
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const [isTimeUp, setIsTimeUp] = useState(false);
+    const audioRef = useRef<HTMLAudioElement>(null); // Reference for the audio element
+
+    // Calculate the time to complete the pickup based on the distance
+    const calculatePickupTime = (distance: string) => {
+        const km = parseFloat(distance) || 0;
+        const speedKmPerMin = 1;
+        return Math.ceil(km / speedKmPerMin) + 15; // Add 15 min buffer
+    };
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            setTime((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    onTimeUp();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+        const storedStartTime = localStorage.getItem('pickupStartTime');
+        let startTime = storedStartTime ? parseInt(storedStartTime) : null;
 
-        return () => clearInterval(timer);
-    }, [onTimeUp]);
+        if (!startTime) {
+            // If no start time is found, set the current time as start time
+            startTime = Date.now();
+            localStorage.setItem('pickupStartTime', startTime.toString());
+        }
 
-    // Convert seconds to hours, minutes, and seconds
-    const hours = Math.floor(time / 3600);
-    const minutes = Math.floor((time % 3600) / 60);
-    const seconds = time % 60;
+        // Calculate the time needed to complete the pickup
+        const totalPickupTime = calculatePickupTime(pickupDistance || '0') * 60 * 1000;
+
+        const updateTimer = () => {
+            const currentTime = Date.now();
+            const timeElapsed = currentTime - startTime;
+
+            if (timeElapsed >= totalPickupTime) {
+                setIsTimeUp(true);
+                onTimeUp(); // Trigger time up action
+            } else {
+                setElapsedTime(timeElapsed);
+            }
+        };
+
+        const timerInterval = setInterval(updateTimer, 1000);
+
+        return () => {
+            clearInterval(timerInterval);
+        };
+    }, [pickupDistance, onTimeUp]);
+
+    // Play alert sound when time is up
+    useEffect(() => {
+        if (isTimeUp && audioRef.current) {
+            audioRef.current.play();
+        }
+    }, [isTimeUp]);
+
+    // Convert milliseconds to minutes and seconds for display
+    const formatTime = (time: number) => {
+        const totalSeconds = Math.floor(time / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    };
 
     return (
-        <TimerContainer>
-            <TimerIcon>🕒</TimerIcon>
-            <TimerText isBlinking={time <= 0}>
-                {hours}h {minutes}m {seconds}s
-            </TimerText>
-        </TimerContainer>
+        <div>
+            <TimerContainer>
+                <TimerText isBlinking={isTimeUp}>
+                    {isTimeUp ? 'Time Up!' : formatTime(elapsedTime)}
+                </TimerText>
+            </TimerContainer>
+
+            {/* Audio element for the alert sound */}
+            <audio ref={audioRef} src="\public\mixkit-signal-alert-771.wav" preload="auto" />
+        </div>
     );
 };
 
