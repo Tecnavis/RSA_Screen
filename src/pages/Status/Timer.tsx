@@ -60,11 +60,9 @@ const Timer: React.FC<TimerProps> = ({ pickupDistance, onTimeUp }) => {
 
     useEffect(() => {
         const storedStartTime = localStorage.getItem('pickupStartTime');
-        let startTime = storedStartTime ? parseInt(storedStartTime) : null;
+        let startTime = storedStartTime ? parseInt(storedStartTime) : Date.now(); // Default to current time
 
-        if (!startTime) {
-            // If no start time is found, set the current time as start time
-            startTime = Date.now();
+        if (!storedStartTime) {
             localStorage.setItem('pickupStartTime', startTime.toString());
         }
 
@@ -73,7 +71,7 @@ const Timer: React.FC<TimerProps> = ({ pickupDistance, onTimeUp }) => {
 
         const updateTimer = () => {
             const currentTime = Date.now();
-            const timeElapsed = currentTime - startTime;
+            const timeElapsed = currentTime - startTime; // No longer null
 
             if (timeElapsed >= totalPickupTime) {
                 setIsTimeUp(true);
@@ -114,7 +112,7 @@ const Timer: React.FC<TimerProps> = ({ pickupDistance, onTimeUp }) => {
             </TimerContainer>
 
             {/* Audio element for the alert sound */}
-            <audio ref={audioRef} src="\public\mixkit-signal-alert-771.wav" preload="auto" />
+            <audio ref={audioRef} src="\public\short-beep-countdown-81121.mp3" preload="auto" />
         </div>
     );
 };

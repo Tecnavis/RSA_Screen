@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { IRootState } from '../store';
@@ -8,7 +8,6 @@ import './Index.css';
 
 const Index = () => {
     const isDark = useSelector((state: IRootState) => state.themeConfig.theme === 'dark' || state.themeConfig.isDarkMode);
-    const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass === 'rtl');
     const db = getFirestore();
     const uid = import.meta.env.VITE_REACT_APP_UID
     const [loading, setLoading] = useState(true);
@@ -16,6 +15,7 @@ const Index = () => {
         series: [0, 0, 0, 0],
         options: { /* Initial chart options */ }
     });
+    const audioRef = useRef<HTMLAudioElement>(null); // Reference to the audio element
 
     useEffect(() => {
         const fetchBookings = () => {
@@ -127,6 +127,13 @@ const Index = () => {
         fetchBookings();
     }, [isDark, db]);
 
+    useEffect(() => {
+        if (salesByCategory.series[0] > 0 && audioRef.current) {
+            audioRef.current.play();
+        }
+    }, [salesByCategory.series[0]]); // Play the sound only when the first value (ShowRoom Bookings) changes
+
+
     return (
         <div className="container mx-auto p-6 bg-cover bg-center bg-no-repeat">
         
@@ -155,6 +162,7 @@ const Index = () => {
                    
                 </div>
             </div>
+            <audio ref={audioRef} src="/public/mixkit-signal-alert-771.wav" preload="auto" />
         </div>
     );
 };

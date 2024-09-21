@@ -145,7 +145,7 @@ interface BookingRecord {
     dateTime?: string;
     status?: string;
     bookingStatus?: string;
-    bookingId?: string;
+    fileNumber?: string;
     driver?: string;
     vehicleNumber?: string;
     selectedDriver?: string;
@@ -244,7 +244,7 @@ const StatusTable = () => {
                 <thead>
                     <tr>
                         <TableHeader>Date & Time</TableHeader>
-                        <TableHeader>BookingID</TableHeader>
+                        <TableHeader>File Number</TableHeader>
                         <TableHeader>Driver Name</TableHeader>
                         <TableHeader>Vehicle Number</TableHeader>
                         <TableHeader>Status</TableHeader>
@@ -254,7 +254,7 @@ const StatusTable = () => {
                     {ongoingBookings.map((record) => (
                         <TableRow key={record.id} highlight={record.bookingStatus === 'ShowRoom Booking'}>
                             <TableData>{record.dateTime}</TableData>
-                            <TableData>{record.bookingId}</TableData>
+                            <TableData>{record.fileNumber}</TableData>
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
                             <TableData>
@@ -279,7 +279,7 @@ const StatusTable = () => {
                 <thead>
                     <tr>
                         <TableHeader>Date & Time</TableHeader>
-                        <TableHeader>BookingID</TableHeader>
+                        <TableHeader>fileNumber</TableHeader>
                         <TableHeader>Driver Name</TableHeader>
                         <TableHeader>Vehicle Number</TableHeader>
                         <TableHeader>Status</TableHeader>
@@ -289,7 +289,7 @@ const StatusTable = () => {
                     {completedBookings.map((record) => (
                         <TableRow key={record.id}>
                             <TableData>{record.dateTime}</TableData>
-                            <TableData>{record.bookingId}</TableData>
+                            <TableData>{record.fileNumber}</TableData>
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
                             <TableData>
