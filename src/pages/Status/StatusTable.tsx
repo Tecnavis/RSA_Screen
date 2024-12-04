@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { setPageTitle } from '../../store/themeConfigSlice';
 import {
@@ -24,6 +24,23 @@ const fadeIn = keyframes`
     }
     to {
         opacity: 1;
+    }
+`;
+const HighlightedTableData = styled.td`
+    padding: 20px;
+    font-size: 1.1rem;
+    text-align: center;
+    border: 2px solid #4CAF50; /* Bold green border */
+    border-radius: 10px; /* Rounded corners */
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2); /* Stronger shadow */
+    background: linear-gradient(135deg, #e0ffe0, #f9f9f9); /* Gradient background */
+    color: #333; /* Darker text for readability */
+    font-weight: bold; /* Bold text */
+    transition: transform 0.2s, box-shadow 0.2s; /* Smooth hover effects */
+
+    &:hover {
+        transform: scale(1.05); /* Slight zoom on hover */
+        box-shadow: 6px 6px 15px rgba(0, 0, 0, 0.3); /* Stronger shadow on hover */
     }
 `;
 
@@ -149,7 +166,9 @@ interface BookingRecord {
     driver?: string;
     vehicleNumber?: string;
     selectedDriver?: string;
-    pickupDistance?: string; // Add pickupDistance in km
+    pickupDistance?: string;
+    pickedTime: Timestamp | null | undefined;
+    droppedTime: Timestamp | null | undefined;
 }
 
 const StatusTable = () => {
@@ -160,6 +179,9 @@ const StatusTable = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const db = getFirestore();
     const uid = import.meta.env.VITE_REACT_APP_UID;
+    const [scrollDirection, setScrollDirection] = useState<'up' | 'down'>('down');
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         dispatch(setPageTitle('Status'));
@@ -184,7 +206,44 @@ const StatusTable = () => {
 
         return () => unsubscribe();
     }, [db, dispatch, uid]);
+    const startScrolling = () => {
+        if (scrollIntervalRef.current) return; // Prevent multiple intervals
+        scrollIntervalRef.current = setInterval(() => {
+            if (tableContainerRef.current) {
+                const { scrollTop, scrollHeight, clientHeight } = tableContainerRef.current;
+    
+                console.log({ scrollTop, scrollHeight, clientHeight });
+    
+                if (scrollDirection === 'down') {
+                    if (scrollTop + clientHeight >= scrollHeight - 1) {
+                        setScrollDirection('up');
+                    } else {
+                        tableContainerRef.current.scrollBy({ top: 10 });
+                    }
+                } else {
+                    if (scrollTop <= 1) {
+                        setScrollDirection('down');
+                    } else {
+                        tableContainerRef.current.scrollBy({ top: -10 });
+                    }
+                }
+            }
+        }, 300); // Adjust speed as needed
+    };
+    
+    const stopScrolling = () => {
+        if (scrollIntervalRef.current) {
+            clearInterval(scrollIntervalRef.current);
+            scrollIntervalRef.current = null;
+        }
+    };
 
+    useEffect(() => {
+        startScrolling();
+        return stopScrolling; // Cleanup on component unmount
+    }, [scrollDirection]);
+    
+    
     const filteredRecordsData = recordsData
         .filter((record) =>
             Object.values(record).some((value) =>
@@ -201,13 +260,31 @@ const StatusTable = () => {
 
     const completedBookings = sortedRecordsData.filter((record) => record.status === 'Order Completed');
     const ongoingBookings = sortedRecordsData.filter((record) => record.status !== 'Order Completed');
-    const formatTimestamp = (timestamp: Timestamp): string => {
-        if (!timestamp) return '';
+    const formatTimestamp = (timestamp: Timestamp | null | undefined): string => {
+        if (!timestamp) return "";
+    
+        // Convert Firestore timestamp to JavaScript Date object
         const date = timestamp.toDate();
-        const formattedDate = date.toLocaleDateString('en-GB');
-        const formattedTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        return `${formattedDate} ${formattedTime}`;
+    
+        // Define the options for formatting
+        const options: Intl.DateTimeFormatOptions = {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZoneName: 'short',
+            hour12: false, // 24-hour format
+        };
+    
+        // Use Intl.DateTimeFormat for proper formatting
+        const formattedDate = new Intl.DateTimeFormat('en-IN', options).format(date);
+    
+        // Replace the "at" position manually since Intl.DateTimeFormat can't add it
+        return formattedDate.replace(', ', ' at ');
     };
+
 
     const calculatePickupTime = (pickupDistance: string) => {
         console.log("Pickup distance input:", pickupDistance);
@@ -240,13 +317,28 @@ const StatusTable = () => {
         <Container style={{ padding: '40px' }}>
             <Title>Driver Status</Title>
             <Index />
+            <div
+            ref={tableContainerRef}
+            onMouseEnter={stopScrolling}
+            onMouseLeave={startScrolling}
+            style={{
+                height: '600px',
+                overflow: 'auto',
+                border: '.5px solid black',
+            }}
+        >
+
+
             <Table>
-                <thead>
-                    <tr>
+            <thead style={{ position: 'sticky', top: 0, backgroundColor: 'white' }}>
+            <tr>
                         <TableHeader>Date & Time</TableHeader>
                         <TableHeader>File Number</TableHeader>
                         <TableHeader>Driver Name</TableHeader>
                         <TableHeader>Vehicle Number</TableHeader>
+                        <TableHeader>Picked Time</TableHeader>
+                        <TableHeader>Dropped Time</TableHeader>
+
                         <TableHeader>Status</TableHeader>
                     </tr>
                 </thead>
@@ -257,6 +349,8 @@ const StatusTable = () => {
                             <TableData>{record.fileNumber}</TableData>
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
+                            <HighlightedTableData>{formatTimestamp(record?.pickedTime)}</HighlightedTableData>
+                            <HighlightedTableData>{formatTimestamp(record?.droppedTime)}</HighlightedTableData>
                             <TableData>
                                 <FlexContainer>
                                     <StatusBadge
@@ -274,6 +368,7 @@ const StatusTable = () => {
                     ))}
                 </tbody>
             </Table>
+            </div>
             <Title>Order Completed</Title>
             <Table>
                 <thead>
@@ -282,6 +377,8 @@ const StatusTable = () => {
                         <TableHeader>fileNumber</TableHeader>
                         <TableHeader>Driver Name</TableHeader>
                         <TableHeader>Vehicle Number</TableHeader>
+                        <TableHeader>Picked Time</TableHeader>
+                        <TableHeader>Dropped Time</TableHeader>
                         <TableHeader>Status</TableHeader>
                     </tr>
                 </thead>
@@ -292,6 +389,8 @@ const StatusTable = () => {
                             <TableData>{record.fileNumber}</TableData>
                             <TableData>{record.driver}</TableData>
                             <TableData>{record.vehicleNumber}</TableData>
+                            <HighlightedTableData>{formatTimestamp(record?.pickedTime)}</HighlightedTableData>
+                            <HighlightedTableData>{formatTimestamp(record?.droppedTime)}</HighlightedTableData>
                             <TableData>
                                 <StatusBadge
                                         style={{display:"flex"}}
