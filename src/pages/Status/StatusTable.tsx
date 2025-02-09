@@ -274,17 +274,13 @@ const StatusTable = () => {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
-            timeZoneName: 'short',
-            hour12: false, // 24-hour format
+            hour12: true, // 12-hour format with AM/PM
         };
     
         // Use Intl.DateTimeFormat for proper formatting
-        const formattedDate = new Intl.DateTimeFormat('en-IN', options).format(date);
-    
-        // Replace the "at" position manually since Intl.DateTimeFormat can't add it
-        return formattedDate.replace(', ', ' at ');
+        return new Intl.DateTimeFormat('en-IN', options).format(date);
     };
-
+    
 
     const calculatePickupTime = (pickupDistance: string) => {
         console.log("Pickup distance input:", pickupDistance);
